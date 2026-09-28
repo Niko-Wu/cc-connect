@@ -18,7 +18,7 @@ func modelsAPIStub(t *testing.T, hits *int32) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(hits, 1)
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"data":[{"id":"api-model","display_name":"API Model"}]}`)
+		_, _ = io.WriteString(w, `{"data":[{"id":"api-model","display_name":"API Model"}]}`)
 	}))
 	t.Cleanup(srv.Close)
 	return srv
