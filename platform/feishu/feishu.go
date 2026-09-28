@@ -988,8 +988,11 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 		})
 
 		title := answer
-		if len(title) > 50 {
-			title = title[:50] + "…"
+		// Truncate by runes, not bytes: free-form answers are exactly where
+		// CJK text shows up, and a byte cut would slice a multi-byte character
+		// in half and show roughly a third of the intended length.
+		if rs := []rune(title); len(rs) > 50 {
+			title = string(rs[:50]) + "…"
 		}
 		return &callback.CardActionTriggerResponse{
 			Card: &callback.Card{

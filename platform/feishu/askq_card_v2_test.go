@@ -1,6 +1,8 @@
 package feishu
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,7 +54,7 @@ func TestBuildAskQuestionCard2(t *testing.T) {
 			if !ok {
 				t.Fatalf("button %d behaviors value has wrong type", buttons)
 			}
-			wantAction := "askq:0:" + itoa(buttons)
+			wantAction := "askq:0:" + strconv.Itoa(buttons)
 			if value["action"] != wantAction {
 				t.Fatalf("button %d action = %v, want %q", buttons, value["action"], wantAction)
 			}
@@ -82,22 +84,6 @@ func TestBuildAskQuestionCard2(t *testing.T) {
 	if !foundForm {
 		t.Fatal("missing free-form answer form")
 	}
-}
-
-func itoa(n int) string {
-	if n == 1 {
-		return "1"
-	}
-	if n == 2 {
-		return "2"
-	}
-	if n == 3 {
-		return "3"
-	}
-	if n == 4 {
-		return "4"
-	}
-	return "?"
 }
 
 func TestOnCardActionAskqTextFormSubmit(t *testing.T) {
@@ -144,6 +130,64 @@ func TestOnCardActionAskqTextFormSubmit(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected the answer to be dispatched as a user message")
 	}
+}
+
+// The confirmation card echoes the answer in its title, truncated to 50. That
+// cut must count runes, not bytes: free-form answers are exactly where CJK text
+// shows up, and a byte cut slices a multi-byte character in half and shows
+// about a third of the intended length.
+func TestOnCardActionAskqTextTruncatesTitleByRunes(t *testing.T) {
+	platformAny, err := New(map[string]any{"app_id": "cli_xxx", "app_secret": "secret", "enable_feishu_card": true})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	ip, ok := platformAny.(*interactivePlatform)
+	if !ok {
+		t.Fatalf("platform type = %T, want *interactivePlatform", platformAny)
+	}
+	ip.handler = func(core.Platform, *core.Message) {}
+
+	answer := strings.Repeat("先出码后置完成", 10) // 70 runes, 210 bytes
+	resp, err := ip.onCardAction(&larkcallback.CardActionTriggerEvent{
+		Event: &larkcallback.CardActionTriggerRequest{
+			Operator: &larkcallback.Operator{OpenID: "ou_test_user"},
+			Action: &larkcallback.CallBackAction{
+				Name:      "submit",
+				FormValue: map[string]any{"answer": answer},
+				Value:     map[string]any{},
+			},
+			Context: &larkcallback.Context{OpenChatID: "oc_test_chat", OpenMessageID: "om_test_message"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("onCardAction() error = %v", err)
+	}
+	if resp == nil || resp.Card == nil {
+		t.Fatal("expected a confirmation card response")
+	}
+
+	want := "✅ " + string([]rune(answer)[:50]) + "…"
+	if got := cardTitle(resp.Card.Data); got != want {
+		t.Fatalf("confirmation title = %q, want %q", got, want)
+	}
+}
+
+// cardTitle digs the header title out of a raw schema 2.0 card payload.
+func cardTitle(data any) string {
+	m, ok := data.(map[string]any)
+	if !ok {
+		return ""
+	}
+	header, ok := m["header"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	title, ok := header["title"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	content, _ := title["content"].(string)
+	return content
 }
 
 func TestOnCardActionFormSubmitWithoutAnswerIsIgnored(t *testing.T) {
