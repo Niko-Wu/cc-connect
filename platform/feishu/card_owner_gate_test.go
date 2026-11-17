@@ -77,10 +77,21 @@ func TestOnCardAction_NonRequesterAskqClickRejected(t *testing.T) {
 // engine and the callback returns the replacement card. Regression for the
 // "button not greyed out after click" report: the replacement card the
 // clicker gets back must carry no live buttons.
+// withAskqToken mints a pending ask-question claim for the session and
+// returns a click event carrying it. The token contract (card 2.0) rejects a
+// click that no claim backs, so owner-gate tests must click a claimable card.
+func withAskqToken(ip *interactivePlatform, openID, action, sessionKey string) *callback.CardActionTriggerEvent {
+	ev := cardActionEventWithKey(openID, action, sessionKey)
+	if strings.HasPrefix(action, "askq:") {
+		ev.Event.Action.Value["askq_token"] = ip.askq.mint(sessionKey, "oc_test_chat", 0, "Pick one", "", "expired", "too-long")
+	}
+	return ev
+}
+
 func TestOnCardAction_RequesterAskqClickDispatchesWithButtonlessCard(t *testing.T) {
 	ip, msgCh := newAllowFromTestPlatform(t, "*")
 
-	resp, err := ip.onCardAction(cardActionEventWithKey("ou_owner", "askq:0:1", "feishu:oc_test_chat:ou_owner"))
+	resp, err := ip.onCardAction(withAskqToken(ip, "ou_owner", "askq:0:1", "feishu:oc_test_chat:ou_owner"))
 	if err != nil {
 		t.Fatalf("onCardAction() error = %v", err)
 	}
@@ -149,7 +160,7 @@ func TestOnCardAction_RequesterPermClickDispatches(t *testing.T) {
 func TestOnCardAction_ThreadSessionAskqNotGated(t *testing.T) {
 	ip, msgCh := newAllowFromTestPlatform(t, "*")
 
-	_, err := ip.onCardAction(cardActionEventWithKey("ou_teammate", "askq:0:1", "feishu:oc_test_chat:root:om_root"))
+	_, err := ip.onCardAction(withAskqToken(ip, "ou_teammate", "askq:0:1", "feishu:oc_test_chat:root:om_root"))
 	if err != nil {
 		t.Fatalf("onCardAction() error = %v", err)
 	}
