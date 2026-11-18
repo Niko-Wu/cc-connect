@@ -287,7 +287,12 @@ func TestOnCardAction_AllowFromMultiListRespectsExactMember(t *testing.T) {
 // engine must not echo it as a second chat message.
 func TestOnCardAction_AskqMarksAnswerRendered(t *testing.T) {
 	ip, msgCh := newAllowFromTestPlatform(t, "*")
-	_, err := ip.onCardAction(cardActionEvent("ou_owner", "askq:0:1"))
+	// Card 2.0 binds every click to a one-time claim; mint one for the
+	// clicking session so the click is claimable rather than stale.
+	sessionKey := ip.sessionKeyFromCardAction("oc_test_chat", "ou_owner", nil)
+	ev := cardActionEvent("ou_owner", "askq:0:1")
+	ev.Event.Action.Value["askq_token"] = ip.askq.mint(sessionKey, "oc_test_chat", 0, "Pick one", "", "expired", "too-long")
+	_, err := ip.onCardAction(ev)
 	if err != nil {
 		t.Fatalf("onCardAction() error = %v", err)
 	}

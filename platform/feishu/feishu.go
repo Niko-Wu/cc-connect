@@ -1246,11 +1246,12 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 		// as-is, so forwarding the raw text answers the pending question.
 		if actionVal == "askq_text" {
 			p.dispatchCardActionMessage(chatID, &core.Message{
-				SessionKey: sessionKey,
-				Platform:   p.platformName,
-				UserID:     userID,
-				Content:    answer,
-				ReplyCtx:   rctx,
+				SessionKey:         sessionKey,
+				Platform:           p.platformName,
+				UserID:             userID,
+				Content:            answer,
+				ReplyCtx:           rctx,
+				CardAnswerRendered: true,
 			})
 
 			title := answer
